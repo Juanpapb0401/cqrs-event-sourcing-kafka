@@ -14,6 +14,7 @@ spring:
       username: root
       password: techbankRootPsw
   kafka:
+    topic: BankAccountEvents
     listener:
       ack-mode: MANUAL_IMMEDIATE
     consumer:
