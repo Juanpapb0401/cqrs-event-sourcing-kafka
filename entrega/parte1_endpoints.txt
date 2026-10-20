@@ -1,0 +1,137 @@
+### 1. OpenAccount (John Doe)
+$ curl -X POST http://localhost:5002/api/v1/openBankAccount -H Content-Type: application/json -d {"accountHolder":"John Doe","accountType":"SAVINGS","openingBalance":1000.00}
+HTTP/1.1 201 
+Content-Type: application/json
+Transfer-Encoding: chunked
+Date: Mon, 19 Oct 2026 21:29:06 GMT
+
+{"message":"Bank account creation request completed successfully!","id":"da84e8f1-633c-49be-99c5-de4af1fcf830"}
+
+### 1b. OpenAccount (Maria Lopez)
+$ curl -X POST http://localhost:5002/api/v1/openBankAccount -H Content-Type: application/json -d {"accountHolder":"Maria Lopez","accountType":"CURRENT","openingBalance":250.00}
+HTTP/1.1 201 
+Content-Type: application/json
+Transfer-Encoding: chunked
+Date: Mon, 19 Oct 2026 21:29:07 GMT
+
+{"message":"Bank account creation request completed successfully!","id":"512e94ee-fd30-40f6-bf85-fa6c70e35c7f"}
+
+### 2. DepositFunds +500
+$ curl -X PUT http://localhost:5002/api/v1/depositFunds/da84e8f1-633c-49be-99c5-de4af1fcf830 -H Content-Type: application/json -d {"amount":500.00}
+HTTP/1.1 200 
+Content-Type: application/json
+Transfer-Encoding: chunked
+Date: Mon, 19 Oct 2026 21:29:09 GMT
+
+{"message":"Deposit funds request completed successfully!"}
+
+### 3. WithdrawFunds -200
+$ curl -X PUT http://localhost:5002/api/v1/withdrawFunds/da84e8f1-633c-49be-99c5-de4af1fcf830 -H Content-Type: application/json -d {"amount":200.00}
+HTTP/1.1 200 
+Content-Type: application/json
+Transfer-Encoding: chunked
+Date: Mon, 19 Oct 2026 21:29:10 GMT
+
+{"message":"Withdraw funds request completed successfully!"}
+
+### 3b. WithdrawFunds -99999 (insufficient funds)
+$ curl -X PUT http://localhost:5002/api/v1/withdrawFunds/da84e8f1-633c-49be-99c5-de4af1fcf830 -H Content-Type: application/json -d {"amount":99999.00}
+HTTP/1.1 400 
+Content-Type: application/json
+Transfer-Encoding: chunked
+Date: Mon, 19 Oct 2026 21:29:12 GMT
+Connection: close
+
+{"message":"java.lang.IllegalStateException: Withdrawal declined, insufficient funds!"}
+
+### 5a. Lookup all
+$ curl http://localhost:5001/api/v1/bankAccountLookup/
+HTTP/1.1 200 
+Content-Type: application/json
+Transfer-Encoding: chunked
+Date: Mon, 19 Oct 2026 21:29:14 GMT
+
+{"message":"Successfully returned 2 bank account(s)!","accounts":[{"id":"512e94ee-fd30-40f6-bf85-fa6c70e35c7f","accountHolder":"Maria Lopez","creationDate":"2026-10-19T21:29:07.713+00:00","accountType":"CURRENT","balance":250.0},{"id":"da84e8f1-633c-49be-99c5-de4af1fcf830","accountHolder":"John Doe","creationDate":"2026-10-19T21:29:05.963+00:00","accountType":"SAVINGS","balance":1300.0}]}
+
+### 5b. Lookup by id
+$ curl http://localhost:5001/api/v1/bankAccountLookup/byId/da84e8f1-633c-49be-99c5-de4af1fcf830
+HTTP/1.1 200 
+Content-Type: application/json
+Transfer-Encoding: chunked
+Date: Mon, 19 Oct 2026 21:29:15 GMT
+
+{"message":"Successfully returned bank account!","accounts":[{"id":"da84e8f1-633c-49be-99c5-de4af1fcf830","accountHolder":"John Doe","creationDate":"2026-10-19T21:29:05.963+00:00","accountType":"SAVINGS","balance":1300.0}]}
+
+### 5c. Lookup by holder
+$ curl http://localhost:5001/api/v1/bankAccountLookup/byHolder/John%20Doe
+HTTP/1.1 200 
+Content-Type: application/json
+Transfer-Encoding: chunked
+Date: Mon, 19 Oct 2026 21:29:17 GMT
+
+{"message":"Successfully returned bank account!","accounts":[{"id":"da84e8f1-633c-49be-99c5-de4af1fcf830","accountHolder":"John Doe","creationDate":"2026-10-19T21:29:05.963+00:00","accountType":"SAVINGS","balance":1300.0}]}
+
+### 5d. Balance GREATER_THAN 1000
+$ curl http://localhost:5001/api/v1/bankAccountLookup/withBalance/GREATER_THAN/1000
+HTTP/1.1 200 
+Content-Type: application/json
+Transfer-Encoding: chunked
+Date: Mon, 19 Oct 2026 21:29:18 GMT
+
+{"message":"Successfully returned 1 bank account(s)!","accounts":[{"id":"da84e8f1-633c-49be-99c5-de4af1fcf830","accountHolder":"John Doe","creationDate":"2026-10-19T21:29:05.963+00:00","accountType":"SAVINGS","balance":1300.0}]}
+
+### 5d. Balance EQUAL_TO 1300
+$ curl http://localhost:5001/api/v1/bankAccountLookup/withBalance/EQUAL_TO/1300
+HTTP/1.1 400 
+Content-Type: application/json
+Transfer-Encoding: chunked
+Date: Mon, 19 Oct 2026 21:29:20 GMT
+Connection: close
+
+{"timestamp":"2026-10-19T21:29:20.257+00:00","status":400,"error":"Bad Request","message":"","path":"/api/v1/bankAccountLookup/withBalance/EQUAL_TO/1300"}
+
+### 5d. Balance LESS_THAN 500
+$ curl http://localhost:5001/api/v1/bankAccountLookup/withBalance/LESS_THAN/500
+HTTP/1.1 200 
+Content-Type: application/json
+Transfer-Encoding: chunked
+Date: Mon, 19 Oct 2026 21:29:21 GMT
+
+{"message":"Successfully returned 1 bank account(s)!","accounts":[{"id":"512e94ee-fd30-40f6-bf85-fa6c70e35c7f","accountHolder":"Maria Lopez","creationDate":"2026-10-19T21:29:07.713+00:00","accountType":"CURRENT","balance":250.0}]}
+
+### 4. CloseAccount (John Doe)
+$ curl -X DELETE http://localhost:5002/api/v1/closeBankAccount/da84e8f1-633c-49be-99c5-de4af1fcf830
+HTTP/1.1 200 
+Content-Type: application/json
+Transfer-Encoding: chunked
+Date: Mon, 19 Oct 2026 21:29:23 GMT
+
+{"message":"Bank account closure request successfully completed!"}
+
+### 5a. Lookup all after close
+$ curl http://localhost:5001/api/v1/bankAccountLookup/
+HTTP/1.1 200 
+Content-Type: application/json
+Transfer-Encoding: chunked
+Date: Mon, 19 Oct 2026 21:29:24 GMT
+
+{"message":"Successfully returned 1 bank account(s)!","accounts":[{"id":"512e94ee-fd30-40f6-bf85-fa6c70e35c7f","accountHolder":"Maria Lopez","creationDate":"2026-10-19T21:29:07.713+00:00","accountType":"CURRENT","balance":250.0}]}
+
+### 6. RestoreReadDb
+$ curl -X POST http://localhost:5002/api/v1/restoreReadDb
+HTTP/1.1 201 
+Content-Type: application/json
+Transfer-Encoding: chunked
+Date: Mon, 19 Oct 2026 21:29:26 GMT
+
+{"message":"Read database restore request completed successfully!"}
+
+### 5a. Lookup all after restore
+$ curl http://localhost:5001/api/v1/bankAccountLookup/
+HTTP/1.1 200 
+Content-Type: application/json
+Transfer-Encoding: chunked
+Date: Mon, 19 Oct 2026 21:29:28 GMT
+
+{"message":"Successfully returned 1 bank account(s)!","accounts":[{"id":"512e94ee-fd30-40f6-bf85-fa6c70e35c7f","accountHolder":"Maria Lopez","creationDate":"2026-10-19T21:29:07.713+00:00","accountType":"CURRENT","balance":250.0}]}
+

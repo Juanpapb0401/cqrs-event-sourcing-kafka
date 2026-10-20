@@ -1,0 +1,172 @@
+{
+  "info": {
+    "name": "CQRS Bank Account - Tarea",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "cmd",
+      "value": "http://localhost:5002"
+    },
+    {
+      "key": "query",
+      "value": "http://localhost:5001"
+    },
+    {
+      "key": "accountId",
+      "value": ""
+    },
+    {
+      "key": "accountHolder",
+      "value": "John Doe"
+    },
+    {
+      "key": "accountType",
+      "value": "SAVINGS"
+    },
+    {
+      "key": "openingBalance",
+      "value": "1000"
+    },
+    {
+      "key": "depositAmount",
+      "value": "500"
+    },
+    {
+      "key": "withdrawAmount",
+      "value": "200"
+    },
+    {
+      "key": "balanceFilter",
+      "value": "500"
+    }
+  ],
+  "item": [
+    {
+      "name": "01 - OpenAccount (POST)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{cmd}}/api/v1/openBankAccount",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"accountHolder\": \"{{accountHolder}}\",\n  \"accountType\": \"{{accountType}}\",\n  \"openingBalance\": {{openingBalance}}\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.collectionVariables.set('accountId', pm.response.json().id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 - DepositFunds (PUT)",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{cmd}}/api/v1/depositFunds/{{accountId}}",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"amount\": {{depositAmount}}\n}"
+        }
+      }
+    },
+    {
+      "name": "03 - WithdrawFunds (PUT)",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{cmd}}/api/v1/withdrawFunds/{{accountId}}",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"amount\": {{withdrawAmount}}\n}"
+        }
+      }
+    },
+    {
+      "name": "04 - Lookup: todas las cuentas (GET)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{query}}/api/v1/bankAccountLookup/"
+      }
+    },
+    {
+      "name": "05 - Lookup: por ID (GET)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{query}}/api/v1/bankAccountLookup/byId/{{accountId}}"
+      }
+    },
+    {
+      "name": "06 - Lookup: por titular (GET)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{query}}/api/v1/bankAccountLookup/byHolder/{{accountHolder}}"
+      }
+    },
+    {
+      "name": "07 - Lookup: balance GREATER_THAN (GET)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{query}}/api/v1/bankAccountLookup/withBalance/GREATER_THAN/{{balanceFilter}}"
+      }
+    },
+    {
+      "name": "08 - Lookup: balance LESS_THAN (GET)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{query}}/api/v1/bankAccountLookup/withBalance/LESS_THAN/{{balanceFilter}}"
+      }
+    },
+    {
+      "name": "09 - CloseAccount (DELETE)",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": "{{cmd}}/api/v1/closeBankAccount/{{accountId}}"
+      }
+    },
+    {
+      "name": "10 - Lookup: todas tras cerrar (GET)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{query}}/api/v1/bankAccountLookup/"
+      }
+    },
+    {
+      "name": "11 - RestoreReadDb (POST)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": "{{cmd}}/api/v1/restoreReadDb"
+      }
+    }
+  ]
+}

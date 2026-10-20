@@ -1,0 +1,236 @@
+diff --git a/bank-account/account.cmd/src/main/java/com/techbank/account/cmd/infrastructure/AccountEventProducer.java b/bank-account/account.cmd/src/main/java/com/techbank/account/cmd/infrastructure/AccountEventProducer.java
+index 0f2fbcf..44eb5fa 100644
+--- a/bank-account/account.cmd/src/main/java/com/techbank/account/cmd/infrastructure/AccountEventProducer.java
++++ b/bank-account/account.cmd/src/main/java/com/techbank/account/cmd/infrastructure/AccountEventProducer.java
+@@ -13,6 +13,6 @@ public class AccountEventProducer implements EventProducer {
+ 
+     @Override
+     public void produce(String topic, BaseEvent event) {
+-        this.kafkaTemplate.send(topic, event);
++        this.kafkaTemplate.send(topic, event.getId(), event);
+     }
+ }
+diff --git a/bank-account/account.cmd/src/main/java/com/techbank/account/cmd/infrastructure/AccountEventSourcingHandler.java b/bank-account/account.cmd/src/main/java/com/techbank/account/cmd/infrastructure/AccountEventSourcingHandler.java
+index 087ad36..a6b208f 100644
+--- a/bank-account/account.cmd/src/main/java/com/techbank/account/cmd/infrastructure/AccountEventSourcingHandler.java
++++ b/bank-account/account.cmd/src/main/java/com/techbank/account/cmd/infrastructure/AccountEventSourcingHandler.java
+@@ -6,12 +6,16 @@ import com.techbank.cqrs.core.handlers.EventSourcingHandler;
+ import com.techbank.cqrs.core.infrastructure.EventStore;
+ import com.techbank.cqrs.core.producers.EventProducer;
+ import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.beans.factory.annotation.Value;
+ import org.springframework.stereotype.Service;
+ 
+ import java.util.Comparator;
+ 
+ @Service
+ public class AccountEventSourcingHandler implements EventSourcingHandler<AccountAggregate> {
++    @Value("${spring.kafka.topic}")
++    private String topic;
++
+     @Autowired
+     private EventStore eventStore;
+ 
+@@ -44,7 +48,7 @@ public class AccountEventSourcingHandler implements EventSourcingHandler<Account
+             if (aggregate == null || !aggregate.getActive()) continue;
+             var events = eventStore.getEvents(aggregateId);
+             for(var event: events) {
+-                eventProducer.produce(event.getClass().getSimpleName(), event);
++                eventProducer.produce(topic, event);
+             }
+         }
+     }
+diff --git a/bank-account/account.cmd/src/main/java/com/techbank/account/cmd/infrastructure/AccountEventStore.java b/bank-account/account.cmd/src/main/java/com/techbank/account/cmd/infrastructure/AccountEventStore.java
+index 965e9a8..4793504 100644
+--- a/bank-account/account.cmd/src/main/java/com/techbank/account/cmd/infrastructure/AccountEventStore.java
++++ b/bank-account/account.cmd/src/main/java/com/techbank/account/cmd/infrastructure/AccountEventStore.java
+@@ -9,6 +9,7 @@ import com.techbank.cqrs.core.exceptions.ConcurrencyException;
+ import com.techbank.cqrs.core.infrastructure.EventStore;
+ import com.techbank.cqrs.core.producers.EventProducer;
+ import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.beans.factory.annotation.Value;
+ import org.springframework.stereotype.Service;
+ 
+ import java.util.Date;
+@@ -17,6 +18,9 @@ import java.util.stream.Collectors;
+ 
+ @Service
+ public class AccountEventStore implements EventStore {
++    @Value("${spring.kafka.topic}")
++    private String topic;
++
+     @Autowired
+     private EventProducer eventProducer;
+ 
+@@ -43,7 +47,7 @@ public class AccountEventStore implements EventStore {
+                    .build();
+            var persistedEvent = eventStoreRepository.save(eventModel);
+            if (!persistedEvent.getId().isEmpty()) {
+-               eventProducer.produce(event.getClass().getSimpleName(), event);
++               eventProducer.produce(topic, event);
+            }
+         }
+     }
+diff --git a/bank-account/account.cmd/src/main/resources/application.yml b/bank-account/account.cmd/src/main/resources/application.yml
+index 1405e5b..b9f0887 100644
+--- a/bank-account/account.cmd/src/main/resources/application.yml
++++ b/bank-account/account.cmd/src/main/resources/application.yml
+@@ -8,6 +8,7 @@ spring:
+       port: 27017
+       database: bankAccount
+   kafka:
++    topic: BankAccountEvents
+     producer:
+       bootstrap-servers: localhost:29092
+       key-serializer: org.apache.kafka.common.serialization.StringSerializer
+diff --git a/bank-account/account.query/src/main/java/com/techbank/account/query/infrastructure/consumers/AccountEventConsumer.java b/bank-account/account.query/src/main/java/com/techbank/account/query/infrastructure/consumers/AccountEventConsumer.java
+index 6ff07b9..66e879f 100644
+--- a/bank-account/account.query/src/main/java/com/techbank/account/query/infrastructure/consumers/AccountEventConsumer.java
++++ b/bank-account/account.query/src/main/java/com/techbank/account/query/infrastructure/consumers/AccountEventConsumer.java
+@@ -1,46 +1,40 @@
+ package com.techbank.account.query.infrastructure.consumers;
+ 
+-import com.techbank.account.common.events.AccountClosedEvent;
+-import com.techbank.account.common.events.AccountOpenedEvent;
+-import com.techbank.account.common.events.FundsDepositedEvent;
+-import com.techbank.account.common.events.FundsWithdrawnEvent;
+ import com.techbank.account.query.infrastructure.handlers.EventHandler;
++import com.techbank.cqrs.core.events.BaseEvent;
+ import org.springframework.beans.factory.annotation.Autowired;
+ import org.springframework.kafka.annotation.KafkaListener;
+ import org.springframework.kafka.support.Acknowledgment;
+ import org.springframework.messaging.handler.annotation.Payload;
+ import org.springframework.stereotype.Service;
+ 
++import java.lang.reflect.InvocationTargetException;
++import java.lang.reflect.Method;
++import java.util.logging.Level;
++import java.util.logging.Logger;
++
+ @Service
+ public class AccountEventConsumer implements EventConsumer {
++    private final Logger logger = Logger.getLogger(AccountEventConsumer.class.getName());
++
+     @Autowired
+     private EventHandler eventHandler;
+ 
+-    @KafkaListener(topics = "AccountOpenedEvent", groupId = "${spring.kafka.consumer.group-id}")
+-    @Override
+-    public void consume(@Payload AccountOpenedEvent event, Acknowledgment ack) {
+-        this.eventHandler.on(event);
+-        ack.acknowledge();
+-    }
+-
+-    @KafkaListener(topics = "FundsDepositedEvent", groupId = "${spring.kafka.consumer.group-id}")
+-    @Override
+-    public void consume(@Payload FundsDepositedEvent event, Acknowledgment ack) {
+-        this.eventHandler.on(event);
+-        ack.acknowledge();
+-    }
+-
+-    @KafkaListener(topics = "FundsWithdrawnEvent", groupId = "${spring.kafka.consumer.group-id}")
+-    @Override
+-    public void consume(@Payload FundsWithdrawnEvent event, Acknowledgment ack) {
+-        this.eventHandler.on(event);
+-        ack.acknowledge();
+-    }
+-
+-    @KafkaListener(topics = "AccountClosedEvent", groupId = "${spring.kafka.consumer.group-id}")
++    // Single topic -> Kafka keeps the order of the events within a partition.
++    @KafkaListener(topics = "${spring.kafka.topic}", groupId = "${spring.kafka.consumer.group-id}")
+     @Override
+-    public void consume(@Payload AccountClosedEvent event, Acknowledgment ack) {
+-        this.eventHandler.on(event);
++    public void consume(@Payload BaseEvent event, Acknowledgment ack) {
++        logger.info("Consumed " + event.getClass().getSimpleName() + " v" + event.getVersion() + " for account " + event.getId());
++        try {
++            // Dispatch to the EventHandler.on(...) overload matching the concrete event type
++            Method on = EventHandler.class.getMethod("on", event.getClass());
++            on.invoke(eventHandler, event);
++        } catch (NoSuchMethodException e) {
++            logger.log(Level.WARNING, "No event handler registered for " + event.getClass().getName());
++        } catch (IllegalAccessException | InvocationTargetException e) {
++            logger.log(Level.SEVERE, "Error while handling event " + event.getClass().getName(), e);
++            return; // no ack: the same event is redelivered, order is preserved
++        }
+         ack.acknowledge();
+     }
+ }
+diff --git a/bank-account/account.query/src/main/java/com/techbank/account/query/infrastructure/consumers/EventConsumer.java b/bank-account/account.query/src/main/java/com/techbank/account/query/infrastructure/consumers/EventConsumer.java
+index aed6f55..0005247 100644
+--- a/bank-account/account.query/src/main/java/com/techbank/account/query/infrastructure/consumers/EventConsumer.java
++++ b/bank-account/account.query/src/main/java/com/techbank/account/query/infrastructure/consumers/EventConsumer.java
+@@ -1,15 +1,9 @@
+ package com.techbank.account.query.infrastructure.consumers;
+ 
+-import com.techbank.account.common.events.AccountClosedEvent;
+-import com.techbank.account.common.events.AccountOpenedEvent;
+-import com.techbank.account.common.events.FundsDepositedEvent;
+-import com.techbank.account.common.events.FundsWithdrawnEvent;
++import com.techbank.cqrs.core.events.BaseEvent;
+ import org.springframework.kafka.support.Acknowledgment;
+ import org.springframework.messaging.handler.annotation.Payload;
+ 
+ public interface EventConsumer {
+-    void consume(@Payload AccountOpenedEvent event, Acknowledgment ack);
+-    void consume(@Payload FundsDepositedEvent event, Acknowledgment ack);
+-    void consume(@Payload FundsWithdrawnEvent event, Acknowledgment ack);
+-    void consume(@Payload AccountClosedEvent event, Acknowledgment ack);
++    void consume(@Payload BaseEvent event, Acknowledgment ack);
+ }
+diff --git a/bank-account/account.query/src/main/java/com/techbank/account/query/infrastructure/handlers/AccountEventHandler.java b/bank-account/account.query/src/main/java/com/techbank/account/query/infrastructure/handlers/AccountEventHandler.java
+index 65858df..1c9cc7f 100644
+--- a/bank-account/account.query/src/main/java/com/techbank/account/query/infrastructure/handlers/AccountEventHandler.java
++++ b/bank-account/account.query/src/main/java/com/techbank/account/query/infrastructure/handlers/AccountEventHandler.java
+@@ -46,6 +46,7 @@ public class AccountEventHandler implements EventHandler {
+         }
+         var currentBalance = bankAccount.get().getBalance();
+         var latestBalance = currentBalance - event.getAmount();
++        bankAccount.get().setBalance(latestBalance);
+         accountRepository.save(bankAccount.get());
+     }
+ 
+diff --git a/bank-account/account.query/src/main/resources/application.yml b/bank-account/account.query/src/main/resources/application.yml
+index 3d58b55..0cfb2b4 100644
+--- a/bank-account/account.query/src/main/resources/application.yml
++++ b/bank-account/account.query/src/main/resources/application.yml
+@@ -14,6 +14,7 @@ spring:
+       username: root
+       password: techbankRootPsw
+   kafka:
++    topic: BankAccountEvents
+     listener:
+       ack-mode: MANUAL_IMMEDIATE
+     consumer:
+diff --git a/docker-compose.yml b/docker-compose.yml
+new file mode 100644
+index 0000000..5f99172
+--- /dev/null
++++ b/docker-compose.yml
+@@ -0,0 +1,26 @@
++version: "3.8"
++services:
++  zookeeper:
++    image: confluentinc/cp-zookeeper:7.4.0
++    environment:
++      ZOOKEEPER_CLIENT_PORT: 2181
++  kafka:
++    image: confluentinc/cp-kafka:7.4.0
++    depends_on: [zookeeper]
++    ports: ["29092:29092"]
++    environment:
++      KAFKA_BROKER_ID: 1
++      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
++      KAFKA_LISTENERS: INTERNAL://0.0.0.0:9092,EXTERNAL://0.0.0.0:29092
++      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://localhost:29092
++      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
++      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
++      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
++  mongodb:
++    image: mongo:6
++    ports: ["27017:27017"]
++  mysql:
++    image: mysql:8
++    ports: ["3306:3306"]
++    environment:
++      MYSQL_ROOT_PASSWORD: techbankRootPsw

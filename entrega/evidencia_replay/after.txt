@@ -1,0 +1,1 @@
+$ GET bankAccountLookup/ (despues del replay) -> {"message":"Successfully returned 1 bank account(s)!","accounts":[{"id":"512e94ee-fd30-40f6-bf85-fa6c70e35c7f","accountHolder":"Maria Lopez","creationDate":"2026-10-19T21:29:07.713+00:00","accountType":"CURRENT","balance":250.0}]}

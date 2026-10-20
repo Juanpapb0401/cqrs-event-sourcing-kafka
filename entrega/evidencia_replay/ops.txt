@@ -1,0 +1,6 @@
+$ POST openBankAccount  -> {"message":"Bank account creation request completed successfully!","id":"a0ae541a-1b8f-45ff-b936-faddfe27ea20"}
+$ PUT depositFunds/a0ae541a-1b8f-45ff-b936-faddfe27ea20 {amount:100} -> {"message":"Deposit funds request completed successfully!"}
+$ PUT withdrawFunds/a0ae541a-1b8f-45ff-b936-faddfe27ea20 {amount:30} -> {"message":"Withdraw funds request completed successfully!"}
+$ PUT depositFunds/a0ae541a-1b8f-45ff-b936-faddfe27ea20 {amount:50} -> {"message":"Deposit funds request completed successfully!"}
+$ GET byId (antes del reinicio) -> {"message":"Successfully returned bank account!","accounts":[{"id":"a0ae541a-1b8f-45ff-b936-faddfe27ea20","accountHolder":"Carlos Ruiz","creationDate":"2026-10-20T01:42:18.535+00:00","accountType":"SAVINGS","balance":220.0}]}
+$ DELETE closeBankAccount/a0ae541a-1b8f-45ff-b936-faddfe27ea20 -> {"message":"Bank account closure request successfully completed!"}
